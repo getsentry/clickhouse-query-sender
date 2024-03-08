@@ -53,6 +53,7 @@ def main(filename, host, port, verbose, lines):
             except Exception as e:
                 print(f"Unable to execute query:\n{row['sql']}", file=sys.stderr)
                 print(f"Exception:\n{e}", file=sys.stderr)
+                continue
             if verbose:
                 pprint(
                     {
