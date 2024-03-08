@@ -21,6 +21,7 @@ from clickhouse_driver import Client
 @click.option(
     "--verbose",
     "-v",
+    is_flag=True,
     default=False,
     show_default=True,
     help="The host address for clickhouse.",
