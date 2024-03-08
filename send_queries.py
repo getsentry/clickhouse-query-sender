@@ -1,6 +1,7 @@
 import click
 import csv
 import itertools
+import sys
 from pprint import pprint
 from clickhouse_driver import Client
 
@@ -47,7 +48,11 @@ def main(filename, host, port, verbose, lines):
         if lines > -1:
             reader = itertools.islice(reader, lines)
         for row in reader:
-            client.execute(row["sql"])
+            try:
+                client.execute(row["sql"])
+            except Exception as e:
+                print(f"Unable to execute query:\n{row['sql']}", file=sys.stderr)
+                print(f"Exception:\n{e}", file=sys.stderr)
             if verbose:
                 pprint(
                     {
