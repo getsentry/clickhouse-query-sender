@@ -24,12 +24,18 @@ from numpy import random
     help="The number of metrics per 10s bucket",
 )
 @click.option(
-    "--interval",
+    "--days-ago",
     default=89,
     show_default=True,
     help="The number of days of data to generate",
 )
-def main(host, port, count, interval):
+@click.option(
+    "--batch-size",
+    default=10_000,
+    show_default=True,
+    help="The number of rows to send per query",
+)
+def main(host, port, count, days_ago, batch_size):
     print(f"Creating client connection to {host}:{port}")
 
     client = Client(
@@ -62,12 +68,25 @@ def main(host, port, count, interval):
 
     num_rows_inserted = 0
 
-    for time in daterange(datetime.now() - timedelta(days=interval), datetime.now()):
+    batch = []
+
+    for time in daterange(datetime.now() - timedelta(days=days_ago), datetime.now()):
+        batch.extend([make_dist_payload(time) for _ in range(count)])
+        if len(batch) >= batch_size:
+            num_rows_inserted += client.execute(
+                f"INSERT INTO default.generic_metric_distributions_raw_local ({', '.join(columns)}) VALUES",
+                batch,
+            )
+            batch.clear()
+            print(
+                f"Current timestamp: {time}, total rows inserted: {num_rows_inserted}",
+                end="\r",
+            )
+    if batch:
         num_rows_inserted += client.execute(
             f"INSERT INTO default.generic_metric_distributions_raw_local ({', '.join(columns)}) VALUES",
-            [make_dist_payload(time) for _ in range(count)],
+            batch,
         )
-        print(f"Date timestamp: {time}, inserted: {num_rows_inserted}", end="\r")
     print("Done")
 
 
