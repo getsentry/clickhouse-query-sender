@@ -41,6 +41,10 @@ def main(host, port, count, days_ago, batch_size):
     client = Client(
         host=host,
         port=port,
+        settings={
+            "distributed_background_insert_split_batch_on_failure": 1,
+            "max_memory_usage_for_user": 30_000_000_000,
+        },
     )
     columns = [
         "use_case_id",
