@@ -25,7 +25,7 @@ from numpy import random
 )
 @click.option(
     "--interval",
-    default=90,
+    default=89,
     show_default=True,
     help="The number of days of data to generate",
 )
