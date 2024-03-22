@@ -4,6 +4,9 @@ from clickhouse_driver import Client
 import click
 from numpy import random
 from multiprocessing import Pool
+import math
+from itertools import repeat
+
 
 
 
@@ -44,10 +47,21 @@ from multiprocessing import Pool
     show_default=True,
     help="The number of rows to send per query",
 )
-def main(host, port, count, days_ago, days_until, batch_size):
+@click.option(
+    "--num-processes",
+    default=32,
+    show_default=True,
+    help="The number of processes",
+)
+def main(host, port, count, num_processes, days_ago, days_until, batch_size):
 
-    with Pool(processes=5) as pool:
-        pool.starmap(build_and_insert_batch, [(host, port, 89, 80, count, batch_size), (host, port, 79, 70, count, batch_size), (host, port, 69, 60, count, batch_size), (host, port, 59, 50, count, batch_size), (host, port, 49, 40, count, batch_size)])
+    decr = math.ceil((days_ago - days_until) / num_processes)
+    days = [day for day in range(days_ago, days_until, -1*decr)] + [0]
+
+    zipped_days = zip(repeat(host), repeat(port), days[0:len(days)-1], days[1:len(days)], repeat(count), repeat(batch_size))
+
+    with Pool(processes=num_processes) as pool:
+        pool.starmap(build_and_insert_batch, zipped_days)
 
 
 def build_and_insert_batch(host, port, days_ago, days_until, count, batch_size):
