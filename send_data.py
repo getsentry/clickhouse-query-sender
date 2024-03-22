@@ -1,7 +1,13 @@
 from datetime import datetime, timedelta
+from typing import Any, List
 from clickhouse_driver import Client
 import click
 from numpy import random
+from multiprocessing import Pool
+import math
+from itertools import repeat
+
+
 
 
 @click.command()
@@ -30,12 +36,36 @@ from numpy import random
     help="The number of days of data to generate",
 )
 @click.option(
+    "--days-until",
+    default=0,
+    show_default=True,
+    help="The number of days of data to generate",
+)
+@click.option(
     "--batch-size",
     default=10_000,
     show_default=True,
     help="The number of rows to send per query",
 )
-def main(host, port, count, days_ago, batch_size):
+@click.option(
+    "--num-processes",
+    default=32,
+    show_default=True,
+    help="The number of processes",
+)
+def main(host, port, count, num_processes, days_ago, days_until, batch_size):
+
+    decr = math.ceil((days_ago - days_until) / num_processes)
+    days = [day for day in range(days_ago, days_until, -1*decr)] + [0]
+
+    zipped_days = zip(repeat(host), repeat(port), days[0:len(days)-1], days[1:len(days)], repeat(count), repeat(batch_size))
+
+    with Pool(processes=num_processes) as pool:
+        pool.starmap(build_and_insert_batch, zipped_days)
+
+
+def build_and_insert_batch(host, port, days_ago, days_until, count, batch_size):
+
     print(f"Creating client connection to {host}:{port}")
 
     client = Client(
@@ -46,6 +76,7 @@ def main(host, port, count, days_ago, batch_size):
             "max_memory_usage_for_user": 30_000_000_000,
         },
     )
+
     columns = [
         "use_case_id",
         "org_id",
@@ -74,7 +105,7 @@ def main(host, port, count, days_ago, batch_size):
 
     batch = []
 
-    for time in daterange(datetime.now() - timedelta(days=days_ago), datetime.now()):
+    for time in daterange(datetime.now() - timedelta(days=days_ago), datetime.now() - timedelta(days=days_until)):
         batch.extend([make_dist_payload(time) for _ in range(count)])
         if len(batch) >= batch_size:
             num_rows_inserted += client.execute(
@@ -91,6 +122,7 @@ def main(host, port, count, days_ago, batch_size):
             f"INSERT INTO default.generic_metric_distributions_raw_local ({', '.join(columns)}) VALUES",
             batch,
         )
+
     print("Done")
 
 
